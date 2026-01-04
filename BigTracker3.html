@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Big 3 Daily Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+            padding: 24px;
+        }
+        .header { text-align: center; margin-bottom: 28px; }
+        .date-input {
+            font-size: 14px; padding: 8px 12px; border: 2px solid #e0e0e0;
+            border-radius: 6px; text-align: center; margin-bottom: 16px; width: 100%;
+        }
+        h1 { color: #333; font-size: 28px; margin-bottom: 8px; }
+        .subtitle { color: #666; font-size: 14px; }
+        .big3-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+        .task-item { background: #f8f9fa; border-left: 4px solid #667eea; padding: 16px; border-radius: 8px; }
+        .task-item.completed { background: #e8f5e9; border-left-color: #4caf50; }
+        .task-item.progress { background: #fff3e0; border-left-color: #ff9800; }
+        .task-number {
+            display: inline-block; background: #667eea; color: white;
+            width: 28px; height: 28px; border-radius: 50%; text-align: center;
+            line-height: 28px; font-weight: bold; margin-bottom: 8px;
+        }
+        .task-input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 12px; }
+        .status-buttons { display: flex; gap: 8px; }
+        button { flex: 1; padding: 8px; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .active { color: white !important; font-weight: bold; }
+        .btn-pending.active { background: #667eea; }
+        .btn-progress.active { background: #ff9800; }
+        .btn-completed.active { background: #4caf50; }
+        .action-buttons { display: flex; gap: 12px; }
+        .btn-save { background: #667eea; color: white; flex: 2; padding: 12px; font-weight: bold; border-radius: 8px; border: none; cursor: pointer; }
+        .btn-reset { background: #f0f0f0; color: #999; flex: 1; border-radius: 8px; border: none; cursor: pointer; }
+        .status-bar { background: #f0f0f0; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 16px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Big 3</h1>
+            <p class="subtitle">Focus on what matters</p>
+            <input type="date" id="dateInput" class="date-input">
+        </div>
+
+        <div class="status-bar">
+            <span id="statusText">0 of 3 completed</span>
+        </div>
+
+        <div class="big3-list" id="big3List"></div>
+
+        <div class="action-buttons">
+            <button class="btn-save" id="saveBtn" onclick="syncToSheets()">Sync to Google Sheets</button>
+            <button class="btn-reset" onclick="resetDay()">Clear</button>
+        </div>
+    </div>
+
+<script>
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxs6dzF8WnL71AnMsL6oNnvAJS10h7JmU6BUA-MNElnIk06vYjBXR36HJcYeFJ2Gcs/exec";
+    const big3List = document.getElementById('big3List');
+    const dateInput = document.getElementById('dateInput');
+
+    function setDefaultDate() {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+        loadData();
+    }
+
+    function loadData() {
+        const date = dateInput.value;
+        const data = JSON.parse(localStorage.getItem(`big3_${date}`) || '[{},{},{}]');
+        big3List.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            big3List.appendChild(createTaskItem(i, data[i] || {}));
+        }
+        updateStatus();
+    }
+
+    function createTaskItem(index, data) {
+        const div = document.createElement('div');
+        const status = data.status || 'pending';
+        div.className = `task-item ${status}`;
+        div.innerHTML = `
+            <div class="task-number">${index + 1}</div>
+            <input type="text" class="task-input" placeholder="Priority task..." value="${data.text || ''}" onchange="updateTask(${index}, this.value)">
+            <div class="status-buttons">
+                <button class="btn-pending ${status === 'pending' ? 'active' : ''}" onclick="updateStatusBtn(${index}, 'pending')">Pending</button>
+                <button class="btn-progress ${status === 'progress' ? 'active' : ''}" onclick="updateStatusBtn(${index}, 'progress')">Progress</button>
+                <button class="btn-completed ${status === 'completed' ? 'active' : ''}" onclick="updateStatusBtn(${index}, 'completed')">Done</button>
+            </div>
+        `;
+        return div;
+    }
+
+    function updateTask(index, text) {
+        const date = dateInput.value;
+        let data = JSON.parse(localStorage.getItem(`big3_${date}`) || '[{},{},{}]');
+        data[index].text = text;
+        localStorage.setItem(`big3_${date}`, JSON.stringify(data));
+        updateStatus();
+    }
+
+    function updateStatusBtn(index, status) {
+        const date = dateInput.value;
+        let data = JSON.parse(localStorage.getItem(`big3_${date}`) || '[{},{},{}]');
+        data[index].status = status;
+        localStorage.setItem(`big3_${date}`, JSON.stringify(data));
+        loadData();
+    }
+
+    function updateStatus() {
+        const date = dateInput.value;
+        const data = JSON.parse(localStorage.getItem(`big3_${date}`) || '[]');
+        const completed = data.filter(item => item.status === 'completed').length;
+        document.getElementById('statusText').textContent = `${completed} of 3 completed`;
+    }
+
+    async function syncToSheets() {
+        const btn = document.getElementById('saveBtn');
+        const date = dateInput.value;
+        const data = JSON.parse(localStorage.getItem(`big3_${date}`) || '[{},{},{}]');
+        
+        btn.textContent = 'Syncing...';
+        btn.disabled = true;
+
+        try {
+            await fetch(G_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ date: date, tasks: data })
+            });
+            btn.textContent = 'Success!';
+            btn.style.background = '#4caf50';
+        } catch (e) {
+            btn.textContent = 'Error - Check Console';
+            btn.style.background = '#f44336';
+        }
+
+        setTimeout(() => {
+            btn.textContent = 'Sync to Google Sheets';
+            btn.style.background = '#667eea';
+            btn.disabled = false;
+        }, 2000);
+    }
+
+    function resetDay() {
+        if(confirm('Clear tasks for this date?')) {
+            localStorage.removeItem(`big3_${dateInput.value}`);
+            loadData();
+        }
+    }
+
+    dateInput.addEventListener('change', loadData);
+    setDefaultDate();
+</script>
+</body>
+</html>
